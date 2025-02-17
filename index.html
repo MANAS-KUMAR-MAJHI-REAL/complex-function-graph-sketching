@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complex Function Plot</title>
+    <style>
+        body {
+            background: linear-gradient(to bottom, pink, white);
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+        .container {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+        canvas {
+            border: 1px solid black;
+            cursor: crosshair;
+            background: white;
+        }
+        .input-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        input, button {
+            margin: 10px;
+            width: 300px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .scale-container {
+            text-align: center;
+            margin-top: 10px;
+        }
+        h2, label {
+            text-align: center;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h2>Complex Function Plotter</h2>
+    
+    <div class="input-container">
+        <label for="functionInput">Enter Complex Function:</label>
+        <input type="text" id="functionInput" value="z*z">
+        <button onclick="clearCanvas()">Erase Sketch</button>
+    </div>
+
+    <div class="scale-container">
+        <label for="scaleSlider">Scale:</label>
+        <input type="range" id="scaleSlider" min="5" max="50" value="10">
+    </div>
+
+    <div class="container">
+        <div>
+            <h3>Input Plane</h3>
+            <canvas id="inputPlane" width="500" height="500"></canvas>
+        </div>
+        <div>
+            <h3>Output Plane</h3>
+            <canvas id="outputPlane" width="500" height="500"></canvas>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/10.6.4/math.min.js"></script>
+    <script>
+        const inputCanvas = document.getElementById("inputPlane");
+        const outputCanvas = document.getElementById("outputPlane");
+        const inputCtx = inputCanvas.getContext("2d");
+        const outputCtx = outputCanvas.getContext("2d");
+        const functionInput = document.getElementById("functionInput");
+        const scaleSlider = document.getElementById("scaleSlider");
+
+        let drawing = false;
+        let scale = parseFloat(scaleSlider.value);
+        let lastInput = null;
+        let lastOutput = null;
+
+        function drawPlane(ctx) {
+            ctx.strokeStyle = "black";
+            ctx.clearRect(0, 0, 500, 500);
+            ctx.beginPath();
+            ctx.moveTo(250, 0);
+            ctx.lineTo(250, 500);
+            ctx.moveTo(0, 250);
+            ctx.lineTo(500, 250);
+            ctx.stroke();
+
+            
+            ctx.font = "12px Arial";
+            ctx.fillStyle = "black";
+            for (let i = -25; i <= 25; i += 5) {
+                if (i !== 0) {
+                    ctx.fillText(((10/scale)*i).toFixed(2), 250 + i * (500 / 50), 265);
+                    ctx.fillText(((10/scale)*i).toFixed(2), 220, 250 - i * (500 / 50));
+                }
+            }
+        }
+
+        function evaluateFunction(zx, zy, funcStr) {
+            try {
+                
+                let z = math.complex(zx, zy);
+                let conjZ = math.conj(z); 
+                let modZ = math.abs(z);  
+        
+                
+                let processedFunc = funcStr
+                    .replace(/re\(z\)/g, `(${z.re})`)    
+                    .replace(/im\(z\)/g, `(${z.im})`)    
+                    .replace(/conj\(z\)/g, `(${conjZ})`)
+                    .replace(/\|z\|/g, `(${modZ})`);   
+        
+                
+                let fz = math.evaluate(processedFunc, { z });
+        
+                
+                return [math.re(fz), math.im(fz)];
+            } catch (e) {
+                alert("Invalid function! Please enter a valid mathematical expression.");
+                return [0, 0]; 
+            }
+        }
+        
+
+        function clearCanvas() {
+            drawPlane(inputCtx);
+            drawPlane(outputCtx);
+        }
+
+        function getPosition(event) {
+            const rect = inputCanvas.getBoundingClientRect();
+            let x, y;
+
+            if (event.touches) {
+                x = event.touches[0].clientX - rect.left;
+                y = event.touches[0].clientY - rect.top;
+            } else {
+                x = event.clientX - rect.left;
+                y = event.clientY - rect.top;
+            }
+
+            return { x, y };
+        }
+
+        function startDrawing(event) {
+            event.preventDefault();
+            drawing = true;
+            lastInput = null;
+            lastOutput = null;
+        }
+
+        function stopDrawing() {
+            drawing = false;
+            lastInput = null;
+            lastOutput = null;
+        }
+
+        function draw(event) {
+            if (!drawing) return;
+            event.preventDefault();
+
+            const { x, y } = getPosition(event);
+
+            
+            const zx = (x - 250) / scale;
+            const zy = -(y - 250) / scale;
+
+    
+            const funcStr = functionInput.value;
+            const [fx, fy] = evaluateFunction(zx, zy, funcStr);
+
+            
+            const newX = 250 + fx * scale;
+            const newY = 250 - fy * scale;
+
+            
+            inputCtx.strokeStyle = "red";
+            inputCtx.lineWidth = 2;
+            inputCtx.lineCap = "round";
+
+            if (lastInput !== null) {
+                inputCtx.beginPath();
+                inputCtx.moveTo(lastInput.x, lastInput.y);
+                inputCtx.lineTo(x, y);
+                inputCtx.stroke();
+            }
+            lastInput = { x, y };
+
+            
+            outputCtx.strokeStyle = "blue";
+            outputCtx.lineWidth = 2;
+            outputCtx.lineCap = "round";
+
+            if (lastOutput !== null) {
+                outputCtx.beginPath();
+                outputCtx.moveTo(lastOutput.x, lastOutput.y);
+                outputCtx.lineTo(newX, newY);
+                outputCtx.stroke();
+            }
+            lastOutput = { x: newX, y: newY };
+        }
+        
+        inputCanvas.addEventListener("mousedown", startDrawing);
+        inputCanvas.addEventListener("mouseup", stopDrawing);
+        inputCanvas.addEventListener("mousemove", draw);
+
+        inputCanvas.addEventListener("touchstart", startDrawing, { passive: false });
+        inputCanvas.addEventListener("touchend", stopDrawing);
+        inputCanvas.addEventListener("touchmove", draw, { passive: false });
+
+        scaleSlider.addEventListener("input", function () {
+            scale = parseFloat(scaleSlider.value);
+            clearCanvas();
+        });
+
+        drawPlane(inputCtx);
+        drawPlane(outputCtx);
+    </script>
+</body>
+</html>
